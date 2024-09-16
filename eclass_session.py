@@ -1,7 +1,7 @@
 import configparser
 import requests
 from bs4 import BeautifulSoup
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 import logging
 import json
 from dataclasses import dataclass
@@ -73,6 +73,22 @@ class EclassSession:
         except requests.RequestException as e:
             logging.error(f"과목 목록 가져오기 중 오류 발생: {e}")
             return []
+        
+    def post_request(self, url: str, data: Dict[str, Any]) -> str:
+        """
+        지정된 URL로 POST 요청을 보내고 응답 내용을 반환합니다.
+
+        :param url: POST 요청을 보낼 URL
+        :param data: POST 요청에 포함할 데이터 딕셔너리
+        :return: 응답 내용 (문자열)
+        """
+        try:
+            response = self.session.post(url, data=data)
+            response.raise_for_status()  # HTTP 오류 발생 시 예외를 발생시킵니다.
+            return response.text
+        except requests.RequestException as e:
+            print(f"POST 요청 중 오류 발생: {e}")
+            return ""
 
     def _parse_course_element(self, element: BeautifulSoup) -> Optional[Course]:
         name_elem = element.find('em', class_='sub_open')
