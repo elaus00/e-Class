@@ -1,0 +1,5 @@
+BASE_URL = "https://eclass.seoultech.ac.kr"
+LOGIN_URL = f"{BASE_URL}/ilos/lo/login.acl"
+MAIN_URL = f"{BASE_URL}/ilos/main/main_form.acl"
+COURSE_ACCESS_URL = f"{BASE_URL}/ilos/st/course/eclass_room2.acl"
+SUBMAIN_URL = f"{BASE_URL}/ilos/st/course/submain_form.acl"
