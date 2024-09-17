@@ -1,4 +1,3 @@
-import logging
 import os
 from bs4 import BeautifulSoup
 from .base import MenuHandler
@@ -26,16 +25,16 @@ class NoticeMenuHandler(MenuHandler):
             'encoding': 'utf-8'
         }
         
-        logging.info(f"Sending request to {notice_url}")
+        # logging.info(f"Sending request to {notice_url}")
         content = self.session.post_request(notice_url, data)
-        logging.info(f"Received response. Content length: {len(content)}")
+        # logging.info(f"Received response. Content length: {len(content)}")
         
         if content:
             self._save_html_content(content, 'notice_list.html')
             notices = self._parse_notices(content)
             self._display_notices(notices)
         else:
-            logging.error("No content received from the server")
+            # logging.error("No content received from the server")
             print("공지사항을 불러올 수 없습니다.")
 
     def _save_html_content(self, html_content: str, filename: str) -> None:
@@ -47,10 +46,10 @@ class NoticeMenuHandler(MenuHandler):
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(html_content)
             
-            logging.info(f"HTML content saved to {file_path}")
+            # logging.info(f"HTML content saved to {file_path}")
             print(f"HTML 내용이 {file_path}에 저장되었습니다.")
         except Exception as e:
-            logging.error(f"Error saving HTML content: {e}")
+            # logging.error(f"Error saving HTML content: {e}")
             print("HTML 내용 저장 중 오류가 발생했습니다.")
 
     def _parse_notices(self, html_content: str) -> List[Dict[str, str]]:
@@ -58,7 +57,7 @@ class NoticeMenuHandler(MenuHandler):
         notice_rows = soup.find_all('tr', style="cursor: pointer;")
         
         if not notice_rows:
-            logging.warning("Could not find any rows with style 'cursor: pointer;'")
+            # logging.warning("Could not find any rows with style 'cursor: pointer;'")
             return []
 
         notices = []
@@ -81,7 +80,8 @@ class NoticeMenuHandler(MenuHandler):
                     'detail_url': detail_url
                 }
                 notices.append(notice)
-                logging.info(f"Parsed notice: {notice}")
+                # logging.info(f"Parsed notice: {notice}")
+        notices.reverse()
 
         return notices
 
