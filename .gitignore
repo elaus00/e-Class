@@ -76,3 +76,18 @@ export/
 
 # debug 폴더 제외
 debug/
+
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Configuration files
+config.ini
+
+# IDE specific files (optional, but recommended)
+.vscode/
+.idea/
+
+# Operating system files
+.DS_Store
+Thumbs.db
