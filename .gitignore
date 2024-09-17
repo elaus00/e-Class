@@ -70,3 +70,9 @@ coverage.xml
 
 # Ignore "원본 코드" folder
 원본 코드/
+
+# export 폴더 제외
+export/
+
+# debug 폴더 제외
+debug/

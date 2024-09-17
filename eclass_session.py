@@ -174,3 +174,8 @@ class EclassSession:
         except requests.RequestException as e:
             logging.error(f"페이지 내용 가져오기 중 오류 발생: {e}")
             return ""
+        
+    def get_request(self, url: str) -> str:
+        response = self.session.get(url)
+        response.raise_for_status()
+        return response.text

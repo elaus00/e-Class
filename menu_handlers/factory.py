@@ -16,6 +16,6 @@ class MenuFactory:
     }
 
     @staticmethod
-    def create_handler(menu_type: MenuType, session: EclassSession) -> MenuHandler:
+    def create_handler(menu_type: MenuType, session: EclassSession, course_id: str) -> MenuHandler:
         handler_class = MenuFactory.handler_map.get(menu_type, DefaultMenuHandler)
-        return handler_class(session)
+        return handler_class(session, course_id)

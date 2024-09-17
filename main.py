@@ -44,7 +44,7 @@ def main():
                     logging.error("잘못된 입력입니다. 다시 시도해주세요.")
                     continue
 
-                handler = MenuFactory.create_handler(menu_type, eclass)
+                handler = MenuFactory.create_handler(menu_type, eclass, selected_course.id)
                 handler.handle(menu_data)
                 
                 input("\n엔터를 눌러 계속...")
