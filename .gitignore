@@ -83,6 +83,7 @@ __pycache__/
 
 # Configuration files
 config.ini
+키 모음
 
 # IDE specific files (optional, but recommended)
 .vscode/

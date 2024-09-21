@@ -1,5 +1,5 @@
 from typing import Dict, Type
-from eclass_session import EclassSession, MenuType
+from scrapping.eclass_session import EclassSession, MenuType
 from .base import MenuHandler
 from . import PlanMenuHandler, OnlineLectureMenuHandler, NoticeMenuHandler, LectureMaterialMenuHandler, AttendanceMenuHandler, AssignmentMenuHandler, TeamProjectMenuHandler, ExamMenuHandler, DefaultMenuHandler
 

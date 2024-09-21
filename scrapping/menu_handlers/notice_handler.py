@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from .base import MenuHandler
 from typing import Dict, List
 from config import BASE_URL, get_config
-from eclass_session import EclassSession
+from scrapping.eclass_session import EclassSession
 import re
 
 class NoticeMenuHandler(MenuHandler):

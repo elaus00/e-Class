@@ -26,13 +26,17 @@ class MenuType(Enum):
     TEAM_PROJECT = auto()
     EXAM = auto()
 
+
 class EclassSession:
     def __init__(self, config_path: str = 'config.ini'):
+        self.user_id = None 
         self.session = requests.Session()
         self.config = self._load_config(config_path)
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
+        self.username = self.config['credentials']['username']
+        self.password = self.config['credentials']['password']
 
     def _load_config(self, config_path: str) -> configparser.ConfigParser:
         config = configparser.ConfigParser()
@@ -42,25 +46,25 @@ class EclassSession:
         return config
 
     def login(self) -> bool:
-        username = self.config['credentials']['username']
-        password = self.config['credentials']['password']
         login_data = {
-            "usr_id": username,
-            "usr_pwd": password,
+            "usr_id": self.username,
+            "usr_pwd": self.password,
             "returnURL": "",
         }
         try:
             response = self.session.post(LOGIN_URL, data=login_data, headers=self.headers)
             response.raise_for_status()
             if "document.location.href=" in response.text or "main_form.acl" in response.text:
-                logging.info("로그인 성공")
+                self.user_id = self.username  # 로그인 성공 시 user_id 설정
                 return True
             else:
-                logging.error("로그인 실패")
                 return False
         except requests.RequestException as e:
-            logging.error(f"로그인 중 오류 발생: {e}")
+            print(f"로그인 중 오류 발생: {e}")
             return False
+
+    def get_user_id(self):
+        return self.user_id
 
     def get_course_list(self) -> List[Course]:
         try:
@@ -166,9 +170,15 @@ class EclassSession:
                     }
         return menus
 
-    def get_page_content(self, url: str) -> str:
+    def get_page_content(self, url: str, method: str = "GET", data: dict = None) -> str:
         try:
-            response = self.session.get(url)
+            if method.upper() == "GET":
+                response = self.session.get(url)
+            elif method.upper() == "POST":
+                response = self.session.post(url, data=data)
+            else:
+                raise ValueError(f"지원하지 않는 HTTP 메서드입니다: {method}")
+            
             response.raise_for_status()
             return response.text
         except requests.RequestException as e:
