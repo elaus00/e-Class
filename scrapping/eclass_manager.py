@@ -50,7 +50,7 @@ class EclassManager:
             handler = MenuFactory.create_handler(menu_type, self.eclass, course.id)
             result = handler.handle(menu_data)
             
-            print("처리 결과:", result)
+            # print("처리 결과:", result)
             input("\n엔터를 눌러 계속...")
 
     def _display_menus(self, course, course_menus):
