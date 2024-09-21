@@ -69,7 +69,6 @@ class LectureMaterialMenuHandler(MenuHandler):
         
         return self.parse_materials(content)
 
-
     def print_lecture_materials(self, materials: List[Dict[str, str]]) -> None:
         if not materials:
             logging.info("강의 자료가 없습니다.")
