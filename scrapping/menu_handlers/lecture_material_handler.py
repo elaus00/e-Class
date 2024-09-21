@@ -1,83 +1,80 @@
 from bs4 import BeautifulSoup
-from .base import MenuHandler
 from config import BASE_URL
-from typing import Dict, List
-import logging
+from scrapping.eclass_session import EclassSession
+from utils import save_html_content
 
-class LectureMaterialMenuHandler(MenuHandler):
-    def handle(self, menu_data: Dict[str, str]) -> None:
-        materials = self.get_lecture_materials()
-        self.print_lecture_materials(materials)
+class LectureMaterialMenuHandler:
+    def __init__(self, session : EclassSession, course_id):
+        self.session = session
+        self.course_id = course_id
+        self.username = session.username
 
-    def get_lecture_materials(self) -> List[Dict[str, str]]:
-        list_url = f"{BASE_URL}/st/course/lecture_material_list_form.acl"
+    def get_lecture_material_list(self, start=1, search_value=''):
+        list_url = f"{BASE_URL}/ilos/st/course/lecture_material_list.acl"
         params = {
-            'start': '',
+            'start': str(start),
             'display': '1',
-            'SCH_VALUE': '',
-            'ud': self.session.username,
+            'SCH_VALUE': search_value,
+            'ud': self.username,
             'ky': self.course_id,
             'encoding': 'utf-8'
         }
-        content = self.session.get_page_content(list_url, method="POST", data=params)
-        return self.parse_materials(content)
+        response = self.session.post_request(list_url, params)
+        save_html_content(response, "강의자료 리스트.html")
+        
+        if response:
+            material_list = self.parse_lecture_material_list(response)
+            self.display_lecture_material_list(material_list)
+        else:
+            print("Error fetching lecture material list")
+            return None
 
-    def parse_materials(self, content: str) -> List[Dict[str, str]]:
-            soup = BeautifulSoup(content, 'html.parser')
-            material_rows = soup.select('table.bbslist > tbody > tr')
-            
-            logging.info(f"파싱된 강의 자료 행 수: {len(material_rows)}")
-            
-            if not material_rows:
-                logging.warning("강의 자료 테이블을 찾을 수 없습니다. HTML 내용:")
-                logging.warning(content[:500])  # HTML 내용의 일부만 로깅
+    def parse_lecture_material_list(self, html_content):
+        soup = BeautifulSoup(html_content, 'html.parser')
+        material_rows = soup.select('table.bbslist > tbody > tr')
 
-            materials = []
-            for i, row in enumerate(material_rows):
-                columns = row.select('td')
-                if len(columns) >= 4:
-                    article_num = row.get('id', '').split('_')[-1]
+        materials = []
+        for row in material_rows:
+            columns = row.select('td')
+            if len(columns) >= 5:
+                title_column = columns[2].select_one('a.site-link')
+                if title_column:
+                    title = title_column.select_one('div.subjt_top').text.strip()
+                    date_and_views = title_column.select_one('div.subjt_bottom').text.strip().split()
+                    author = date_and_views[0]
+                    views = date_and_views[-1].replace('조회', '').strip()
+                    date = columns[4].text.strip()
+
                     material = {
                         'number': columns[0].text.strip(),
-                        'title': columns[1].text.strip(),
-                        'date': columns[2].text.strip(),
-                        'file': columns[3].text.strip(),
-                        'details': self.get_material_details(article_num)
+                        'title': title,
+                        'author': author,
+                        'views': views,
+                        'date': date,
+                        'link': self.extract_material_link(row)
                     }
                     materials.append(material)
-                    logging.info(f"파싱된 강의 자료 {i+1}: {material['title']}")
-                else:
-                    logging.warning(f"행 {i+1}에 충분한 열이 없습니다: {len(columns)} 열 발견")
 
-            logging.info(f"총 파싱된 강의 자료 수: {len(materials)}")
-            return materials
+        return materials
+            
+    def extract_material_link(self, row):
+        link_element = row.select_one('a')
+        if link_element:
+            href = link_element.get('href')
+            return f"{BASE_URL}{href}"
+        return None
 
-    def get_lecture_materials(self) -> List[Dict[str, str]]:
-        list_url = f"{BASE_URL}/st/course/lecture_material_list.acl"
-        params = {
-            'start': '',
-            'display': '1',
-            'SCH_VALUE': '',
-            'ud': self.session.username,
-            'ky': self.course_id,
-            'encoding': 'utf-8'
-        }
-        content = self.session.get_page_content(list_url, method="POST", data=params)
-        
-        logging.info("강의 자료 목록 HTML 내용 일부:")
-        logging.info(content[:500])  # HTML 내용의 일부만 로깅
-        
-        return self.parse_materials(content)
-
-    def print_lecture_materials(self, materials: List[Dict[str, str]]) -> None:
-        if not materials:
-            logging.info("강의 자료가 없습니다.")
-            return
-
-        logging.info("강의 자료 목록:")
+    def display_lecture_material_list(self, materials):
+        print("강의 자료 목록:")
+        print("=" * 30)
         for material in materials:
-            logging.info(f"- [{material['number']}] {material['title']} (업로드 날짜: {material['date']}, 파일: {material['file']})")
-            logging.info(f"  내용: {material['details']['content'][:100]}...")
-            if material['details']['attachments']:
-                logging.info(f"  첨부파일: {', '.join(material['details']['attachments'])}")
-            logging.info("")
+            print(f"{material['number']:>3}. {material['title']:<30} | {material['author']:<10} | 조회수: {material['views']:<5} | {material['date']}")
+        print("=" * 30)
+
+    def handle(self, menu_data):
+        html_content = self.get_lecture_material_list()
+        if html_content:
+            materials = self.parse_lecture_material_list(html_content)
+            return materials
+        else:
+            return []
