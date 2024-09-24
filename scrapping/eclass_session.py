@@ -23,7 +23,7 @@ class MenuType(Enum):
     LECTURE_MATERIAL = auto()
     ATTENDANCE = auto()
     ASSIGNMENT = auto()
-    TEAM_PROJECT = auto()
+    TEAM_PROJECT = auto()   
     EXAM = auto()
 
 
@@ -78,7 +78,7 @@ class EclassSession:
             logging.error(f"과목 목록 가져오기 중 오류 발생: {e}")
             return []
         
-    def post_request(self, url: str, data: Dict[str, Any]) -> str:
+    def post_request(self, url: str, data: Dict[str, Any], headers=None) -> str:
         """
         지정된 URL로 POST 요청을 보내고 응답 내용을 반환합니다.
 
@@ -87,7 +87,7 @@ class EclassSession:
         :return: 응답 내용 (문자열)
         """
         try:
-            response = self.session.post(url, data=data)
+            response = self.session.post(url, data=data, headers=headers)
             response.raise_for_status()  # HTTP 오류 발생 시 예외를 발생시킵니다.
             return response.text
         except requests.RequestException as e:
@@ -189,3 +189,43 @@ class EclassSession:
         response = self.session.get(url)
         response.raise_for_status()
         return response.text
+    
+    def head(self, url: str, params: Dict[str, Any] = None) -> requests.Response:
+        """
+        지정된 URL로 HEAD 요청을 보내고 응답을 반환합니다.
+
+        :param url: HEAD 요청을 보낼 URL
+        :param params: 요청에 포함할 매개변수 딕셔너리 (선택사항)
+        :return: requests.Response 객체
+        """
+        try:
+            response = self.session.head(url, params=params, headers=self.headers)
+            response.raise_for_status()
+            return response
+        except requests.RequestException as e:
+            logging.error(f"HEAD 요청 중 오류 발생: {e}")
+            raise
+        
+    def get_detailed_session_info(self) -> Dict[str, Any]:
+        """
+        현재 세션의 상세 정보를 반환합니다.
+        """
+        return {
+            'cookies': [
+                {
+                    'name': cookie.name,
+                    'value': cookie.value,
+                    'domain': cookie.domain,
+                    'path': cookie.path,
+                    'expires': cookie.expires,
+                    'secure': cookie.secure,
+                    'httpOnly': cookie.has_nonstandard_attr('httpOnly')
+                } for cookie in self.session.cookies
+            ],
+            'headers': dict(self.session.headers),
+            'user_id': self.user_id,
+            'base_url': BASE_URL,
+            'login_url': LOGIN_URL,
+            'main_url': MAIN_URL,
+            'password':self.password
+        }

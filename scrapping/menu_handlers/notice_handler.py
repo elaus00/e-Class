@@ -28,10 +28,10 @@ class NoticeMenuHandler(MenuHandler):
             'encoding': 'utf-8'
         }
         
-        notices = fetch_and_parse_list(
+        notices, parsed_data = fetch_and_parse_list(
+            session=self.session,
             url=notice_url,
             params=params,
-            post_request=self.session.post_request,
             display_list=None,
             save_filename="공지사항 리스트.html",
         )
