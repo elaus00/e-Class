@@ -3,7 +3,6 @@ from scrapping.eclass_session import EclassSession
 from utils.html_parser import HTMLParser
 from utils.list_handler import fetch_and_parse_list
 from utils.display_handler import display_list_and_navigate
-from utils.dynamic_page import SeleniumScraper
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 import logging
@@ -14,7 +13,6 @@ class LectureMaterialMenuHandler:
         self.course_id = course_id
         self.username = session.username
         self.html_parser = HTMLParser()
-        self.selenium_scraper = SeleniumScraper()
         self.logger = self._setup_logger()
 
     # 로거 설정을 위한 내부 메소드
