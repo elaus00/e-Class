@@ -1,11 +1,12 @@
 from scrapping.eclass_manager import EclassManager
 import logging
+import asyncio
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def main():
+async def main():
     manager = EclassManager()
-    manager.run()
+    await manager.run()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

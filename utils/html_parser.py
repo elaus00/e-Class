@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 from typing import Dict, List
 from config import BASE_URL
 import logging
+import aiohttp
 
 class HTMLParser:
     ROW_STYLE = "cursor: pointer;"
@@ -10,7 +11,7 @@ class HTMLParser:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
     
-    def parse_list(self, html_content: str) -> Dict[str, List]:
+    async def parse_list(self, html_content: str) -> Dict[str, List]:
         soup = BeautifulSoup(html_content, 'html.parser')
         item_rows = soup.find_all('tr', style=self.ROW_STYLE)
         
@@ -18,26 +19,26 @@ class HTMLParser:
             self.logger.warning("Could not find any rows with style 'cursor: pointer;'")
             return {'items': [], 'ARTL_NUMs': []}
 
-        items = [self._parse_row(row) for row in item_rows if len(row.find_all('td')) >= 5]
+        items = [await self._parse_row(row) for row in item_rows if len(row.find_all('td')) >= 5]
         items.reverse()
 
         # 모든 ARTL_NUM을 별도의 리스트로 추출
         all_artl_nums = [item['ARTL_NUM'] for item in items if item['ARTL_NUM']]
 
-        return items, {'items': items, 'ARTL_NUMs': all_artl_nums}
+        return {'items': items, 'ARTL_NUMs': all_artl_nums}
 
-    def _parse_row(self, row) -> Dict[str, str]:
+    async def _parse_row(self, row) -> Dict[str, str]:
         cols = row.find_all('td')
         title_element = cols[2].find('a', class_='site-link')
         
-        title, author, views = self._parse_title_element(title_element)
+        title, author, views = await self._parse_title_element(title_element)
         onclick_value = cols[2].get('onclick', '')
-        detail_url = self._extract_detail_url(onclick_value)
+        detail_url = await self._extract_detail_url(onclick_value)
         # ARTL_NUM 추출
-        artl_num = self._extract_artl_num(onclick_value)
+        artl_num = await self._extract_artl_num(onclick_value)
         
         # CONTENT_SEQ 추출
-        content_seq = self._extract_content_seq(cols[3])
+        content_seq = await self._extract_content_seq(cols[3])
         
         item = {
             'number': cols[0].text.strip(),
@@ -51,7 +52,7 @@ class HTMLParser:
         }
         return item
 
-    def _parse_title_element(self, title_element):
+    async def _parse_title_element(self, title_element):
         if not title_element:
             return '', '', ''  # title_element가 None인 경우 빈 문자열 반환
 
@@ -68,7 +69,7 @@ class HTMLParser:
 
         return title, author, views
 
-    def _extract_detail_url(self, onclick_value: str) -> str:
+    async def _extract_detail_url(self, onclick_value: str) -> str:
         url_pattern = r"pageMove\('([^']+)'"
         match = re.search(url_pattern, onclick_value)
         if match:
@@ -79,7 +80,7 @@ class HTMLParser:
             self.logger.warning(f"Could not extract URL from onclick value: {onclick_value}")
             return ""
 
-    def _extract_artl_num(self, onclick_value: str) -> str:
+    async def _extract_artl_num(self, onclick_value: str) -> str:
         artl_num_pattern = r"ARTL_NUM=(\d+)"
         match = re.search(artl_num_pattern, onclick_value)
         if match:
@@ -88,7 +89,7 @@ class HTMLParser:
             self.logger.warning(f"Could not extract ARTL_NUM from onclick value: {onclick_value}")
             return ""
 
-    def _extract_content_seq(self, attachment_col) -> str:
+    async def _extract_content_seq(self, attachment_col) -> str:
         download_icon = attachment_col.find('img', class_='download_icon')
         if download_icon and 'onclick' in download_icon.attrs:
             content_seq_pattern = r"downloadClick\('(.+?)'\)"
@@ -98,7 +99,7 @@ class HTMLParser:
         self.logger.warning("Could not extract CONTENT_SEQ from attachment column")
         return ""
 
-    def parse_content(self, html_content: str) -> Dict[str, str]:
+    async def parse_content(self, html_content: str) -> Dict[str, str]:
         soup = BeautifulSoup(html_content, 'html.parser')
         textviewer = soup.find('td', class_='textviewer')
         
@@ -106,14 +107,14 @@ class HTMLParser:
             self.logger.warning("Could not find content in textviewer class")
             return {}
 
-        content = self.clean_content(textviewer)
+        content = await self.clean_content(textviewer)
         
         return {
             'content': content,
         }
 
     @staticmethod
-    def clean_content(content_div: BeautifulSoup) -> str:
+    async def clean_content(content_div: BeautifulSoup) -> str:
         for br in content_div.find_all('br'):
             br.replace_with('\n')
         
@@ -130,7 +131,7 @@ class HTMLParser:
         return '\n'.join([line for line in cleaned_content.splitlines() if line.strip() or line.isspace()])
     
     # 첨부파일 파싱
-    def parse_attachments(self, html_content: str) -> List[Dict[str, str]]:
+    async def parse_attachments(self, html_content: str) -> List[Dict[str, str]]:
         soup = BeautifulSoup(html_content, 'html.parser')
         attachments = []
 

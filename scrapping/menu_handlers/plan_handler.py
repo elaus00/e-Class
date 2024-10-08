@@ -1,4 +1,5 @@
 import os
+import aiofiles  # for asynchronous file I/O
 from bs4 import BeautifulSoup
 from .base import MenuHandler
 from typing import Dict, Any
@@ -6,20 +7,20 @@ from config import BASE_URL
 
 # 강의계획서
 class PlanMenuHandler(MenuHandler):
-    def handle(self, menu_data: Dict[str, str]) -> None:
+    async def handle(self, menu_data: Dict[str, str]) -> None:
         plan_view_url = f"{BASE_URL}/ilos/st/course/plan_view.acl"
         data = {
             'SCH_PROF': menu_data.get('SCH_PROF', ''),
             'encoding': 'utf-8'
         }
-        content = self.session.post_request(plan_view_url, data)
+        content = await self.session.post_request(plan_view_url, data)
         soup = BeautifulSoup(content, 'html.parser')
-        
+
         plan_info = self._extract_plan_info(soup)
-        
+
         if plan_info:
             text_content = self._generate_text(plan_info)
-            success = self._save_text_to_file(text_content, menu_data.get('SCH_PROF', 'unknown'))
+            success = await self._save_text_to_file(text_content, menu_data.get('SCH_PROF', 'unknown'))
             if success:
                 self._print_plan_info(plan_info)
             else:
@@ -34,9 +35,9 @@ class PlanMenuHandler(MenuHandler):
             '[강의계획]': {},
             '[주별강의계획]': []
         }
-        
+
         sections = soup.find_all('div', style=lambda value: value and 'padding-top' in value and 'font-weight: bold' in value)
-        
+
         for section in sections:
             section_title = section.text.strip()
             if section_title in plan_info:
@@ -46,7 +47,7 @@ class PlanMenuHandler(MenuHandler):
                         self._extract_table_info(table, plan_info[section_title])
                     else:
                         self._extract_weekly_plan(table, plan_info[section_title])
-        
+
         return plan_info
 
     def _extract_table_info(self, table, info_dict):
@@ -75,7 +76,7 @@ class PlanMenuHandler(MenuHandler):
 
     def _generate_text(self, plan_info: Dict[str, Any]) -> str:
         text = "강의계획서 정보\n\n"
-        
+
         for section, content in plan_info.items():
             text += f"{section}\n\n"
             if isinstance(content, dict):
@@ -88,10 +89,10 @@ class PlanMenuHandler(MenuHandler):
                     if item['비고']:
                         text += f"   비고: {item['비고']}\n"
                 text += "\n"
-        
+
         return text
 
-    def _save_text_to_file(self, text_content: str, course_id: str) -> bool:
+    async def _save_text_to_file(self, text_content: str, course_id: str) -> bool:
         try:
             print("파일 저장 시작")
             current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -110,16 +111,16 @@ class PlanMenuHandler(MenuHandler):
             # export 디렉토리가 없으면 생성
             os.makedirs(export_dir, exist_ok=True)
             print(f"내보내기 디렉토리 생성 완료")
-            
+
             # 파일 이름에 사용할 수 없는 문자 제거
             safe_course_id = ''.join(c for c in course_id if c.isalnum() or c in ('-', '_'))
             filename = os.path.join(export_dir, f"강의계획서_{safe_course_id}.txt")
             print(f"저장할 파일 경로: {filename}")
-            
-            # 파일 쓰기
-            with open(filename, "w", encoding="utf-8") as f:
-                f.write(text_content)
-            
+
+            # 파일 쓰기 (비동기식으로 변경)
+            async with aiofiles.open(filename, "w", encoding="utf-8") as f:
+                await f.write(text_content)
+
             print(f"강의계획서가 '{filename}' 파일로 저장되었습니다.")
             return True
         except Exception as e:

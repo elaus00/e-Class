@@ -1,12 +1,12 @@
 import configparser
-import requests
+import aiohttp
 from bs4 import BeautifulSoup
 from typing import Dict, List, Optional, Any
 import logging
 import json
 from dataclasses import dataclass
 from enum import Enum, auto
-
+import asyncio
 from config import BASE_URL, LOGIN_URL, MAIN_URL, COURSE_ACCESS_URL, SUBMAIN_URL
 
 @dataclass
@@ -26,18 +26,20 @@ class MenuType(Enum):
     TEAM_PROJECT = auto()   
     EXAM = auto()
 
-
 class EclassSession:
     def __init__(self, config_path: str = 'config.ini'):
-        self.user_id = None 
-        self.session = requests.Session()
+        self.user_id = None
+        self.session = None  # 세션 초기화 지연
         self.config = self._load_config(config_path)
-        self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-        }
         self.username = self.config['credentials']['username']
         self.password = self.config['credentials']['password']
 
+    async def init_session(self):
+        # 이벤트 루프 내에서 세션 초기화
+        self.session = aiohttp.ClientSession(headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        })
+        
     def _load_config(self, config_path: str) -> configparser.ConfigParser:
         config = configparser.ConfigParser()
         config.read(config_path)
@@ -45,40 +47,46 @@ class EclassSession:
             raise ValueError("설정 파일에 'credentials' 섹션이 없습니다.")
         return config
 
-    def login(self) -> bool:
+    async def login(self) -> bool:
+        if self.session is None:
+            await self.init_session()  # 세션 초기화
+        
         login_data = {
             "usr_id": self.username,
             "usr_pwd": self.password,
             "returnURL": "",
         }
         try:
-            response = self.session.post(LOGIN_URL, data=login_data, headers=self.headers)
-            response.raise_for_status()
-            if "document.location.href=" in response.text or "main_form.acl" in response.text:
-                self.user_id = self.username  # 로그인 성공 시 user_id 설정
-                return True
-            else:
-                return False
-        except requests.RequestException as e:
-            print(f"로그인 중 오류 발생: {e}")
+            async with self.session.post(LOGIN_URL, data=login_data) as response:
+                if response.status != 200:
+                    return False
+                text = await response.text()
+                if "document.location.href=" in text or "main_form.acl" in text:
+                    self.user_id = self.username  # 로그인 성공 시 user_id 설정
+                    return True
+                else:
+                    return False
+        except aiohttp.ClientError as e:
+            logging.error(f"로그인 중 오류 발생: {e}")
             return False
+
 
     def get_user_id(self):
         return self.user_id
 
-    def get_course_list(self) -> List[Course]:
+    async def get_course_list(self) -> List[Course]:
         try:
-            response = self.session.get(MAIN_URL)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.text, 'html.parser')
-            course_elements = soup.find_all('li', style=lambda value: value and 'background: url' in value)
-            
-            return [self._parse_course_element(element) for element in course_elements if self._parse_course_element(element)]
-        except requests.RequestException as e:
+            async with self.session.get(MAIN_URL) as response:
+                response.raise_for_status()
+                text = await response.text()
+                soup = BeautifulSoup(text, 'html.parser')
+                course_elements = soup.find_all('li', style=lambda value: value and 'background: url' in value)
+                return [self._parse_course_element(element) for element in course_elements if self._parse_course_element(element)]
+        except aiohttp.ClientError as e:
             logging.error(f"과목 목록 가져오기 중 오류 발생: {e}")
             return []
         
-    def post_request(self, url: str, data: Dict[str, Any], headers=None) -> str:
+    async def post_request(self, url: str, data: Dict[str, Any], headers=None) -> str:
         """
         지정된 URL로 POST 요청을 보내고 응답 내용을 반환합니다.
 
@@ -87,11 +95,11 @@ class EclassSession:
         :return: 응답 내용 (문자열)
         """
         try:
-            response = self.session.post(url, data=data, headers=headers)
-            response.raise_for_status()  # HTTP 오류 발생 시 예외를 발생시킵니다.
-            return response.text
-        except requests.RequestException as e:
-            print(f"POST 요청 중 오류 발생: {e}")
+            async with self.session.post(url, data=data, headers=headers) as response:
+                response.raise_for_status()
+                return await response.text()
+        except aiohttp.ClientError as e:
+            logging.error(f"POST 요청 중 오류 발생: {e}")
             return ""
 
     def _parse_course_element(self, element: BeautifulSoup) -> Optional[Course]:
@@ -110,7 +118,7 @@ class EclassSession:
         
         return Course(id=course_id, name=course_name, code=course_code, time=course_time)
 
-    def access_course(self, course_id: str) -> Optional[str]:
+    async def access_course(self, course_id: str) -> Optional[str]:
         data = {
             "KJKEY": course_id,
             "returnData": "json",
@@ -118,28 +126,29 @@ class EclassSession:
             "encoding": "utf-8"
         }
         try:
-            response = self.session.post(COURSE_ACCESS_URL, data=data)
-            response.raise_for_status()
-            json_data = response.json()
-            if json_data.get('isError'):
-                logging.error(f"과목 접근 실패: {json_data.get('message')}")
-                return None
-            return json_data.get('returnURL')
-        except (requests.RequestException, json.JSONDecodeError) as e:
+            async with self.session.post(COURSE_ACCESS_URL, data=data) as response:
+                response.raise_for_status()
+                json_data = await response.json()
+                if json_data.get('isError'):
+                    logging.error(f"과목 접근 실패: {json_data.get('message')}")
+                    return None
+                return json_data.get('returnURL')
+        except (aiohttp.ClientError, json.JSONDecodeError) as e:
             logging.error(f"과목 접근 중 오류 발생: {e}")
             return None
 
-    def get_course_menus(self, course_id: str) -> Dict[MenuType, Dict[str, str]]:
-        access_url = self.access_course(course_id)
+    async def get_course_menus(self, course_id: str) -> Dict[MenuType, Dict[str, str]]:
+        access_url = await self.access_course(course_id)
         if not access_url:
             return {}
 
         try:
-            response = self.session.get(access_url)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.text, 'html.parser')
-            return self._get_specific_menus(soup)
-        except requests.RequestException as e:
+            async with self.session.get(access_url) as response:
+                response.raise_for_status()
+                text = await response.text()
+                soup = BeautifulSoup(text, 'html.parser')
+                return self._get_specific_menus(soup)
+        except aiohttp.ClientError as e:
             logging.error(f"과목 메뉴 가져오기 중 오류 발생: {e}")
             return {}
 
@@ -170,62 +179,47 @@ class EclassSession:
                     }
         return menus
 
-    def get_page_content(self, url: str, method: str = "GET", data: dict = None) -> str:
+    async def get_page_content(self, url: str, method: str = "GET", data: dict = None) -> str:
         try:
             if method.upper() == "GET":
-                response = self.session.get(url)
+                async with self.session.get(url) as response:
+                    response.raise_for_status()
+                    return await response.text()
             elif method.upper() == "POST":
-                response = self.session.post(url, data=data)
+                async with self.session.post(url, data=data) as response:
+                    response.raise_for_status()
+                    return await response.text()
             else:
                 raise ValueError(f"지원하지 않는 HTTP 메서드입니다: {method}")
-            
-            response.raise_for_status()
-            return response.text
-        except requests.RequestException as e:
+        except aiohttp.ClientError as e:
             logging.error(f"페이지 내용 가져오기 중 오류 발생: {e}")
             return ""
         
-    def get_request(self, url: str) -> str:
-        response = self.session.get(url)
-        response.raise_for_status()
-        return response.text
+    async def get_request(self, url: str) -> str:
+        try:
+            async with self.session.get(url) as response:
+                response.raise_for_status()
+                return await response.text()
+        except aiohttp.ClientError as e:
+            logging.error(f"GET 요청 중 오류 발생: {e}")
+            return ""
     
-    def head(self, url: str, params: Dict[str, Any] = None) -> requests.Response:
+    async def head(self, url: str, params: Dict[str, Any] = None) -> aiohttp.ClientResponse:
         """
         지정된 URL로 HEAD 요청을 보내고 응답을 반환합니다.
 
         :param url: HEAD 요청을 보낼 URL
         :param params: 요청에 포함할 매개변수 딕셔너리 (선택사항)
-        :return: requests.Response 객체
+        :return: aiohttp.ClientResponse 객체
         """
         try:
-            response = self.session.head(url, params=params, headers=self.headers)
-            response.raise_for_status()
-            return response
-        except requests.RequestException as e:
+            async with self.session.head(url, params=params) as response:
+                response.raise_for_status()
+                return response
+        except aiohttp.ClientError as e:
             logging.error(f"HEAD 요청 중 오류 발생: {e}")
             raise
         
-    def get_detailed_session_info(self) -> Dict[str, Any]:
-        """
-        현재 세션의 상세 정보를 반환합니다.
-        """
-        return {
-            'cookies': [
-                {
-                    'name': cookie.name,
-                    'value': cookie.value,
-                    'domain': cookie.domain,
-                    'path': cookie.path,
-                    'expires': cookie.expires,
-                    'secure': cookie.secure,
-                    'httpOnly': cookie.has_nonstandard_attr('httpOnly')
-                } for cookie in self.session.cookies
-            ],
-            'headers': dict(self.session.headers),
-            'user_id': self.user_id,
-            'base_url': BASE_URL,
-            'login_url': LOGIN_URL,
-            'main_url': MAIN_URL,
-            'password':self.password
-        }
+    async def close_session(self):
+        if self.session:
+            await self.session.close()

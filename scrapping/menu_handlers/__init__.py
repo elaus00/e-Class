@@ -7,7 +7,7 @@ from .attendance_handler import AttendanceMenuHandler
 from .assignment_handler import AssignmentMenuHandler
 from .team_project_handler import TeamProjectMenuHandler
 from .exam_handler import ExamMenuHandler
-from .default_handler import DefaultMenuHandler
+from .default_menu_handler import DefaultMenuHandler
 
 __all__ = [
     'MenuHandler',
@@ -19,5 +19,5 @@ __all__ = [
     'AssignmentMenuHandler',
     'TeamProjectMenuHandler',
     'ExamMenuHandler',
-    'DefaultMenuHandler',
+    'DefaultMenuHandler'
 ]

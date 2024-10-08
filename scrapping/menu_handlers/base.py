@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Dict
 from scrapping.eclass_session import EclassSession
 
 class MenuHandler(ABC):
@@ -8,5 +7,5 @@ class MenuHandler(ABC):
         self.course_id = course_id
 
     @abstractmethod
-    def handle(self, menu_data):
+    async def handle(self, menu_data):
         pass
